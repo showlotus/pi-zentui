@@ -93,6 +93,7 @@ import {
 	startProjectRefreshInterval,
 } from "./project-refresh";
 import { applyProjectRefreshToState, projectStateSnapshot } from "./project-state";
+import { createRenderGateController } from "./render-gate";
 import { RepositoryRootController, type RepositoryRootRequest } from "./repository-root";
 import { readRuntimeInfo } from "./runtime";
 import { installSelectorBorderStyle, removeSelectorBorderStyle } from "./selector-border";
@@ -264,6 +265,9 @@ export default function (pi: ExtensionAPI) {
 	let activeTuiContext: ExtensionContext | undefined;
 	let cleanupAccentRailLayoutPatch: () => void = () => {};
 	let accentRailLayoutPatchInstallSerial = 0;
+
+	const renderGate = createRenderGateController();
+	renderGate.ensureInstalled();
 
 	const recordAccentRailLayoutPatchDiagnostic = (
 		diagnostic: AccentRailLayoutPatchDiagnostic,
@@ -878,6 +882,7 @@ export default function (pi: ExtensionAPI) {
 		const sessionTheme = ctx.ui.theme;
 		const generation = sessionLifecycle.currentGeneration();
 		const factory = ((tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
+			renderGate.bindTui(tui);
 			const editor: PolishedEditor = markOwnedAccentRailEditor(
 				new PolishedEditor(
 					tui,
@@ -941,6 +946,7 @@ export default function (pi: ExtensionAPI) {
 		const sessionTheme = ctx.ui.theme;
 		const generation = sessionLifecycle.currentGeneration();
 		const factory = ((tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager) => {
+			renderGate.bindTui(tui);
 			const editor: WrappedPolishedEditor = markOwnedAccentRailEditor(
 				new WrappedPolishedEditor(
 					baseFactory(tui, theme, keybindings),
@@ -1431,6 +1437,8 @@ export default function (pi: ExtensionAPI) {
 		minimalistProjectRoot = undefined;
 		repositoryRoots.reset();
 		installUi(ctx);
+		renderGate.ensureInstalled();
+		renderGate.release();
 		workingLine.startSession(ctx);
 		workingLineSessionReady = true;
 		scheduleEditorReconciliation(ctx);
@@ -1647,7 +1655,8 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
-	pi.on("session_shutdown", async (_event, ctx) => {
+	pi.on("session_shutdown", async (event, ctx) => {
+		renderGate.hold(event.reason);
 		usageTotals.invalidate();
 		footerTelemetry.reset();
 		workingLineSessionReady = false;

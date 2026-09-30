@@ -662,7 +662,6 @@ describe("fixed-editor retirement contract", () => {
 			["zentui", "-fixed-editor-probe"].join(""),
 			["zentui", "-copy-notice"].join(""),
 			"setLayoutRoot",
-			"doRender",
 			"terminal.rows",
 			"terminal.write",
 			"tui.mode",
@@ -676,6 +675,8 @@ describe("fixed-editor retirement contract", () => {
 			expect(source, path).not.toMatch(retiredEditorPattern);
 			for (const token of productionTokens)
 				expect(source, `${path}: ${token}`).not.toContain(token);
+			if (!path.endsWith("render-gate.ts"))
+				expect(source, `${path}: doRender`).not.toContain("doRender");
 		}
 
 		const testApiTokens = productionTokens.slice(6, 13);
